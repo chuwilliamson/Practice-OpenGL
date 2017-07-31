@@ -97,6 +97,10 @@
   <ItemGroup>
     <ClInclude Include="inc\_03___Rendering_GeometryApp.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\fragment.frag" />
+    <None Include="shaders\vertex.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

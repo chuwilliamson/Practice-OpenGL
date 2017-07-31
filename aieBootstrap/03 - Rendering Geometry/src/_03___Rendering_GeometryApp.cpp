@@ -4,23 +4,25 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include "gl_core_4_4.h"
+#include <stdio.h>
+#include <errno.h>
 
 using glm::vec3;
 using glm::vec4;
 using glm::mat4;
 using aie::Gizmos;
 
-_03___Rendering_GeometryApp::_03___Rendering_GeometryApp() {
-
+_03___Rendering_GeometryApp::_03___Rendering_GeometryApp()
+{
 }
 
-_03___Rendering_GeometryApp::~_03___Rendering_GeometryApp() {
-
+_03___Rendering_GeometryApp::~_03___Rendering_GeometryApp()
+{
 }
 
-bool _03___Rendering_GeometryApp::startup() {
-
-	setBackgroundColour(0, 0, 0);	
+bool _03___Rendering_GeometryApp::startup()
+{
+	setBackgroundColour(0.25f, 0.25f, 0.25f);
 
 	assert(generateGrid(5, 5) == true);
 	generateShader();
@@ -31,12 +33,12 @@ bool _03___Rendering_GeometryApp::startup() {
 	return true;
 }
 
-void _03___Rendering_GeometryApp::shutdown() {
-
+void _03___Rendering_GeometryApp::shutdown()
+{
 	Gizmos::destroy();
 }
 
-void _03___Rendering_GeometryApp::update(float deltaTime) 
+void _03___Rendering_GeometryApp::update(float deltaTime)
 {
 	// quit if we press escape
 	aie::Input* input = aie::Input::getInstance();
@@ -49,90 +51,97 @@ void _03___Rendering_GeometryApp::update(float deltaTime)
 	m_projectionViewMatrix = m_projectionMatrix * m_viewMatrix;
 }
 
-void _03___Rendering_GeometryApp::draw() {
-
+void _03___Rendering_GeometryApp::draw()
+{
 	// wipe the screen to the background colour
 	clearScreen();
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
 
 	glUseProgram(m_programID);
 	unsigned int mvpUniform = glGetUniformLocation(m_programID, "mvp");
-	
+
 	glUniformMatrix4fv(mvpUniform, 1, false, glm::value_ptr(m_projectionViewMatrix));
+
 	glBindVertexArray(m_VAO);
-
-	glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
-
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
 
 bool _03___Rendering_GeometryApp::generateGrid(unsigned int rows, unsigned int cols)
 {
+	Vertex* vertices = new Vertex[4];
+	vertices[0] = { vec4(-5, 0, 0, 1), vec4(1, 0, 0, 1) };
+	vertices[1] = { vec4(5, 0, 0, 1), vec4(0, 1, 0, 1) };
+	vertices[2] = { vec4(-5, 5, 0, 1), vec4(0, 0, 1, 1) };
+	vertices[3] = { vec4(5, 5, 0, 1), vec4(1, 1, 1, 1) };
 
-	Vertex* aoVertices = new Vertex[rows * cols];
-	Vertex* triangleVertices = new Vertex[3];
-	triangleVertices[0] = { vec4(0), vec4(1,1,1,1) };
-	triangleVertices[1] = { vec4(0,10,0,0), vec4(1,1,1,1) };
-	triangleVertices[2] = { vec4(10,0,0,0), vec4(1,0,0,1) };
-
+	unsigned int indices[6] = { 0, 1, 2, 2, 1, 3 };
 	// comments on post vs pre increment;
 	// ++i; Fetch i, increment it, and return it
 	// i++; Fetch i, copy it, increment i, return copy
-	for (unsigned int r = 0; r < rows; ++r) {
-		for (unsigned int c = 0; c < cols; ++c) {
-			unsigned int currentIndex = r * cols + c;
-			aoVertices[currentIndex] =
-			{
-				vec4((float)c, 0, (float)r, 1),
-				vec4((float)c*(float)c, 0, (float)r*(float)r, 1)
-			};
-		}
-	}
-	// CREATE BUFFER OBJECTS
-	glGenBuffers(1, &m_VBO);
-	glGenBuffers(1, &m_IBO);
 
 	// CREATE VERTEX ARRAYS
 	glGenVertexArrays(1, &m_VAO);
 	glBindVertexArray(m_VAO);
 
-	glBindBuffer(GL_ARRAY_BUFFER, m_VBO);	
-	glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(Vertex), triangleVertices, GL_STATIC_DRAW);
+	// CREATE BUFFER OBJECTS
+	glGenBuffers(1, &m_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), vertices, GL_STATIC_DRAW);
 
-	glEnableVertexAttribArray(0);//position
-	glEnableVertexAttribArray(1);//colour
 	// How is the data layout in memory?
 	// |-----position----|----colour----|
+	glEnableVertexAttribArray(0);//position	
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+	glEnableVertexAttribArray(1);//colour
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)sizeof(vec4));
-	
-
-	unsigned int* triangleIndices = new unsigned int[3];
-	triangleIndices[0] = 0;
-	triangleIndices[1] = 1;
-	triangleIndices[2] = 2;
 
 	glGenBuffers(1, &m_IBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_IBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * sizeof(unsigned int), triangleIndices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
 
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	// UNBIND
 	glBindVertexArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-
 	return true;
 }
 
+const char* GetShader(const char* filename)
+{
+	char line[100];
+	char buffer[255];
+	FILE* fp;
+
+	//uses the current working directory which is in $(SolutionDir)bin
+
+	fopen_s(&fp, "shaders/vertex.vert", "r");
+	if (fp == nullptr)
+		perror("Error opening file");
+	int i = 0;
+	while (fgets(line, 100, fp) != nullptr)
+	{
+		memcpy(&buffer[i], &line, strlen(line));
+		size_t len = strlen(line);
+		printf("strlen(line)=>%u\n", len);
+		i += len;
+		printf("i=>%u\n", i);
+		buffer[i] = '\0';
+	}
+	
+
+
+
+	assert(buffer != nullptr);
+	
+	return buffer;
+
+
+}
 bool _03___Rendering_GeometryApp::generateShader()
 {
-	const char* vsSource = "#version 410\n \
-							layout(location=0) in vec4 position; \
-							layout(location=1) in vec4 colour; \
-							out vec4 vColour; \
-							uniform mat4 mvp; \
-							void main() { vColour = colour; gl_Position = mvp * position;}";
+	
 
+	const char*	vsSource = GetShader("shaders/vertex.vert");
+	
 	const char* fsSource = "#version 410\n \
 							in vec4 vColour; \
 							out vec4 fragColor; \
@@ -145,7 +154,7 @@ bool _03___Rendering_GeometryApp::generateShader()
 	glCompileShader(vertexShader);
 	glShaderSource(fragmentShader, 1, (const char**)&fsSource, 0);
 	glCompileShader(fragmentShader);
-	
+
 	m_programID = glCreateProgram();
 	glAttachShader(m_programID, vertexShader);
 	glAttachShader(m_programID, fragmentShader);
@@ -163,7 +172,7 @@ bool _03___Rendering_GeometryApp::generateShader()
 		printf("%s\n", infoLog);
 		delete[] infoLog;
 	}
-	
+
 	glDeleteShader(fragmentShader);
 	glDeleteShader(vertexShader);
 
