@@ -28,7 +28,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\fragment.frag" />
-    <None Include="shaders\vertex.vert" />
+    <None Include="..\bin\shaders\fragment.frag" />
+    <None Include="..\bin\shaders\vertex.vert" />
   </ItemGroup>
 </Project>

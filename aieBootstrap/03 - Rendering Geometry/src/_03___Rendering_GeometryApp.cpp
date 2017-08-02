@@ -37,7 +37,7 @@ void _03___Rendering_GeometryApp::shutdown()
 {
 	Gizmos::destroy();
 }
-
+float totalTime = 0;
 void _03___Rendering_GeometryApp::update(float deltaTime)
 {
 	// quit if we press escape
@@ -49,6 +49,7 @@ void _03___Rendering_GeometryApp::update(float deltaTime)
 	// update perspective based on screen size
 	m_projectionMatrix = glm::perspective(glm::pi<float>() * 0.25f, getWindowWidth() / (float)getWindowHeight(), 0.1f, 1000.0f);
 	m_projectionViewMatrix = m_projectionMatrix * m_viewMatrix;
+	totalTime += deltaTime;
 }
 
 void _03___Rendering_GeometryApp::draw()
@@ -59,9 +60,10 @@ void _03___Rendering_GeometryApp::draw()
 
 	glUseProgram(m_programID);
 	unsigned int mvpUniform = glGetUniformLocation(m_programID, "mvp");
+	unsigned int timeUniform = glGetUniformLocation(m_programID, "time");
 
 	glUniformMatrix4fv(mvpUniform, 1, false, glm::value_ptr(m_projectionViewMatrix));
-
+	glUniform1f(timeUniform, totalTime);
 	glBindVertexArray(m_VAO);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
@@ -105,47 +107,50 @@ bool _03___Rendering_GeometryApp::generateGrid(unsigned int rows, unsigned int c
 	return true;
 }
 
-const char* GetShader(const char* filename)
-{
-	char line[100];
-	char buffer[255];
+bool GetShader(const char* filename, char* &buffer)
+{	
+	
+
 	FILE* fp;
 
 	//uses the current working directory which is in $(SolutionDir)bin
-
-	fopen_s(&fp, "shaders/vertex.vert", "r");
+	
+	fopen_s(&fp, filename, "r");
 	if (fp == nullptr)
 		perror("Error opening file");
-	int i = 0;
-	while (fgets(line, 100, fp) != nullptr)
-	{
-		memcpy(&buffer[i], &line, strlen(line));
-		size_t len = strlen(line);
-		printf("strlen(line)=>%u\n", len);
-		i += len;
-		printf("i=>%u\n", i);
-		buffer[i] = '\0';
-	}
+	//put the position to the end
+	fseek(fp, 0, SEEK_END);
+	//get the size of the file
+	size_t size = ftell(fp);	
+	buffer = new char[size + 1];
+	//rewind to beginning 
+	fseek(fp, 0, SEEK_SET);
 	
-
-
-
-	assert(buffer != nullptr);
+	size_t numitems = fread(buffer, sizeof(char), size + 1, fp);	
+	buffer[numitems] = '\0';
 	
-	return buffer;
-
-
+	//no idea why this won't terminate
+	//reading to buffer with a memory size of size + 1
+	//number of items is the size of the stream in bytes which is the number of characters
+	//char is 1 byte
+	
+	//size_t numitems = fread_s(buffer, size + 1, 1, size, fp);
+	//buffer[numitems] = '\0';
+	//aie code is wrong?
+	fclose(fp);	
+	
+	
+	return true;
 }
+
 bool _03___Rendering_GeometryApp::generateShader()
 {
-	
+	char* vsSource;
+	char* fsSource;
+	GetShader("shaders/vertex.vert", vsSource);
+	GetShader("shaders/fragment.frag", fsSource);
 
-	const char*	vsSource = GetShader("shaders/vertex.vert");
-	
-	const char* fsSource = "#version 410\n \
-							in vec4 vColour; \
-							out vec4 fragColor; \
-							void main() {fragColor = vColour;}";
+
 	int success = GL_FALSE;
 	unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
 	unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
