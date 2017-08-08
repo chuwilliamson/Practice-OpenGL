@@ -6,13 +6,17 @@
 #include "gl_core_4_4.h"
 #include <stdio.h>
 #include <errno.h>
+#include <imgui.h>
+#include "imgui_glfw3.h"
 
 using glm::vec3;
 using glm::vec4;
 using glm::mat4;
 using aie::Gizmos;
 
-_03___Rendering_GeometryApp::_03___Rendering_GeometryApp()
+float totalTime = 0;
+
+_03___Rendering_GeometryApp::_03___Rendering_GeometryApp() :m_IBO(0), m_VAO(0), m_VBO(0)
 {
 }
 
@@ -22,34 +26,58 @@ _03___Rendering_GeometryApp::~_03___Rendering_GeometryApp()
 
 bool _03___Rendering_GeometryApp::startup()
 {
-	setBackgroundColour(0.25f, 0.25f, 0.25f);
+	setBackgroundColour(m_clearColour.r, m_clearColour.g, m_clearColour.b);
 
 	assert(generateGrid(5, 5) == true);
 	generateShader();
+	
 	// create simple camera transforms
 	m_viewMatrix = glm::lookAt(vec3(10), vec3(0), vec3(0, 1, 0));
 	m_projectionMatrix = glm::perspective(glm::pi<float>() * 0.25f, 16.0f / 9.0f, 0.1f, 1000.0f);
+	aie::ImGui_Init(m_window, true);
+	auto io = ImGui::GetIO();
+	io.DisplaySize.x = 1280;
+	io.DisplaySize.y = 720;
 
 	return true;
 }
 
 void _03___Rendering_GeometryApp::shutdown()
 {
-	Gizmos::destroy();
+	aie::ImGui_Shutdown();
+
 }
-float totalTime = 0;
+static char* guiText = new char[100];
 void _03___Rendering_GeometryApp::update(float deltaTime)
 {
 	// quit if we press escape
 	aie::Input* input = aie::Input::getInstance();
 
 	if (input->isKeyDown(aie::INPUT_KEY_ESCAPE))
+	{
 		quit();
+	}
+		
+	m_mousePos = glm::vec2(input->getMouseX(), input->getMouseY());
 
 	// update perspective based on screen size
 	m_projectionMatrix = glm::perspective(glm::pi<float>() * 0.25f, getWindowWidth() / (float)getWindowHeight(), 0.1f, 1000.0f);
 	m_projectionViewMatrix = m_projectionMatrix * m_viewMatrix;
 	totalTime += deltaTime;
+
+	ImGui::Begin("Rendering Options");
+	
+	ImGui::ColorEdit3("clear color", glm::value_ptr(m_clearColour));
+	ImGui::Checkbox("render grid", &m_renderBox);
+	
+	sprintf(guiText, "mouse position :: %f, %f", m_mousePos.x, m_mousePos.y);
+	ImGui::Text(guiText);
+	sprintf(guiText, "address of text for mousepos :: %p", guiText);
+	ImGui::Text(guiText);
+	ImGui::End();
+	
+
+	setBackgroundColour(m_clearColour.r, m_clearColour.g, m_clearColour.b);
 }
 
 void _03___Rendering_GeometryApp::draw()
@@ -57,15 +85,15 @@ void _03___Rendering_GeometryApp::draw()
 	// wipe the screen to the background colour
 	clearScreen();
 
-
 	glUseProgram(m_programID);
 	unsigned int mvpUniform = glGetUniformLocation(m_programID, "mvp");
-	unsigned int timeUniform = glGetUniformLocation(m_programID, "time");
-
+	unsigned int timeUniform = glGetUniformLocation(m_programID, "time");	
 	glUniformMatrix4fv(mvpUniform, 1, false, glm::value_ptr(m_projectionViewMatrix));
 	glUniform1f(timeUniform, totalTime);
 	glBindVertexArray(m_VAO);
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	(m_renderBox) ? glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0) : nullptr;
+	glBindVertexArray(0);
+	glUseProgram(0);
 }
 
 bool _03___Rendering_GeometryApp::generateGrid(unsigned int rows, unsigned int cols)
@@ -104,42 +132,40 @@ bool _03___Rendering_GeometryApp::generateGrid(unsigned int rows, unsigned int c
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	// UNBIND
 	glBindVertexArray(0);
+	delete[] vertices;
 	return true;
 }
-
+//TODO::make a shader class
+//::what would a shader class need to implement?
+//::shaders are bound in a program at specific times
 bool GetShader(const char* filename, char* &buffer)
-{	
-	
-
+{
 	FILE* fp;
-
 	//uses the current working directory which is in $(SolutionDir)bin
-	
+
 	fopen_s(&fp, filename, "r");
 	if (fp == nullptr)
 		perror("Error opening file");
 	//put the position to the end
 	fseek(fp, 0, SEEK_END);
 	//get the size of the file
-	size_t size = ftell(fp);	
+	size_t size = ftell(fp);
 	buffer = new char[size + 1];
 	//rewind to beginning 
 	fseek(fp, 0, SEEK_SET);
-	
-	size_t numitems = fread(buffer, sizeof(char), size + 1, fp);	
+
+	size_t numitems = fread(buffer, sizeof(char), size + 1, fp);
 	buffer[numitems] = '\0';
-	
+
 	//no idea why this won't terminate
 	//reading to buffer with a memory size of size + 1
 	//number of items is the size of the stream in bytes which is the number of characters
 	//char is 1 byte
-	
+
 	//size_t numitems = fread_s(buffer, size + 1, 1, size, fp);
 	//buffer[numitems] = '\0';
 	//aie code is wrong?
-	fclose(fp);	
-	
-	
+	fclose(fp);
 	return true;
 }
 
